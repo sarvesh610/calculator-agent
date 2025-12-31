@@ -3,7 +3,7 @@ from typing import Any
 from anthropic import Anthropic
 from ..config.settings import settings
 from ..state.memory import Memory
-from ..tools.calculator import AddNumbersTool, MultiplyNumbersTool
+from ..tools.calculator import AddNumbersTool, MultiplyNumbersTool, SubtractNumbersTool
 from ..tools.memory_tools import SaveResultTool, RecallResultTool
 from ..tools.base import BaseTool
 
@@ -21,6 +21,7 @@ class CalculatorAgent:
             MultiplyNumbersTool(self.memory),
             SaveResultTool(self.memory),
             RecallResultTool(self.memory),
+            SubtractNumbersTool(self.memory)
         ]
         
         # Build tool definitions for Claude
@@ -45,7 +46,7 @@ Be concise and friendly in your responses."""
         definitions = []
         
         for tool in self.tools:
-            if tool.name == "add_numbers" or tool.name == "multiply_numbers":
+            if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers"]:
                 schema = {
                     "type": "object",
                     "properties": {
@@ -171,7 +172,7 @@ Be concise and friendly in your responses."""
                     )
                     
                     # Map input based on tool type
-                    if tool.name in ["add_numbers", "multiply_numbers"]:
+                    if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers"]:
                         tool_input = MathOperationInput(**tool_use.input)
                     elif tool.name == "save_result":
                         tool_input = SaveResultInput(**tool_use.input)
