@@ -23,6 +23,9 @@ Agent: I've saved 126.0 as "my_total" for you!
 
 You: What was my_total?
 Agent: Your saved value "my_total" is 126.0.
+
+You: Subtract 10 from that
+Agent: The result is 116.0
 ```
 
 ---
@@ -43,7 +46,8 @@ calculator-agent/
 │   │   └── memory_tools.py  # Save/recall tools
 │   └── agents/          # Agent orchestrator
 │       └── calculator_agent.py
-├── tests/               # Test directory
+├── tests/               # Pytest unit tests
+├── scripts/             # Verification scripts
 ├── docs/                # Documentation
 ├── main.py              # Entry point
 ├── pyproject.toml       # Dependencies
@@ -157,7 +161,7 @@ ANTHROPIC_API_KEY=sk-ant-api03-your-actual-key-here
 ### 5. Test Setup
 ```bash
 # Quick API test
-uv run python test_api.py
+uv run python scripts/verify_api.py
 ```
 
 **Expected output:**
@@ -211,26 +215,30 @@ Agent: 25 plus 17 equals 42.
 You: Multiply that by 2
 Agent: The result is 84.0
 
-You: Save that as answer
-Agent: I've saved 84.0 as "answer" for you!
+You: Subtract 10 from that
+Agent: The result is 74.0
 
-You: What's 100 plus 50?
-Agent: 100 plus 50 equals 150.
+You: Save that as answer
+Agent: I've saved 74.0 as "answer" for you!
+
+You: What's 100 minus 50?
+Agent: 100 minus 50 equals 50.
 
 You: What was answer?
-Agent: Your saved value "answer" is 84.0.
+Agent: Your saved value "answer" is 74.0.
 
 You: history
 Conversation History:
   - Added 25.0 + 17.0 = 42.0
   - Multiplied 42.0 × 2.0 = 84.0
-  - Saved 84.0 as 'answer'
-  - Added 100.0 + 50.0 = 150.0
-  - Recalled 'answer' = 84.0
+  - Subtracted 10.0 from 84.0 = 74.0
+  - Saved 74.0 as 'answer'
+  - Subtracted 50.0 from 100.0 = 50.0
+  - Recalled 'answer' = 74.0
 
 You: saved
 Saved Results:
-  answer = 84.0
+  answer = 74.0
 
 You: quit
 Goodbye!
@@ -242,19 +250,26 @@ Goodbye!
 
 ### Run Full Test Suite
 ```bash
+# Run all pytest tests
 uv run pytest
+
+# Run with verbose output
+uv run pytest -v
+
+# Run with coverage
+uv run pytest --cov=src
 ```
 
-### Run Specific Tests
+### Run Verification Scripts
 ```bash
-# Test tools only
-uv run python test_tools.py
+# Verify API connection
+uv run python scripts/verify_api.py
 
-# Test architecture components
-uv run python test_architecture.py
+# Verify project setup
+uv run python scripts/verify_setup.py
 
-# Test API connection
-uv run python test_api.py
+# Verify tools manually
+uv run python scripts/verify_tools.py
 ```
 
 ### Expected Test Output
@@ -268,6 +283,10 @@ Testing AddNumbersTool...
 
 Testing MultiplyNumbersTool...
   ✅ 6.0 × 7.0 = 42.0
+
+Testing SubtractNumbersTool...
+  ✅ 10.0 - 3.0 = 7.0
+  ✅ Last result stored: 7.0
 
 Testing SaveResultTool and RecallResultTool...
   ✅ Saved 42.0 as 'my_number'
@@ -289,7 +308,7 @@ Testing conversation flow...
 
 ## 🛠️ Available Tools
 
-The agent has 4 tools available:
+The agent currently has **5 tools** available:
 
 ### 1. Add Numbers
 **Usage:** "What's 5 plus 3?", "Add 10 and 20"
@@ -303,13 +322,19 @@ AddNumbersTool(a, b) → a + b
 MultiplyNumbersTool(a, b) → a × b
 ```
 
-### 3. Save Result
+### 3. Subtract Numbers
+**Usage:** "What's 50 minus 8?", "Subtract 10 from that"
+```python
+SubtractNumbersTool(a, b) → a - b
+```
+
+### 4. Save Result
 **Usage:** "Save that as total", "Remember this as my_number"
 ```python
 SaveResultTool(name, value) → Saves value with name
 ```
 
-### 4. Recall Result
+### 5. Recall Result
 **Usage:** "What was total?", "Recall my_number"
 ```python
 RecallResultTool(name) → Returns saved value
@@ -432,7 +457,7 @@ uv --version
 
 ---
 
-## �� Learning Resources
+## 📚 Learning Resources
 
 ### Understanding the Code
 
@@ -460,7 +485,9 @@ uv --version
 
 Planned features for future sessions:
 
-- [ ] More math tools (subtract, divide, power, sqrt)
+- [ ] Division tool (with error handling)
+- [ ] Power/exponent tool
+- [ ] Square root tool
 - [ ] Persistent storage (SQLite/Redis)
 - [ ] Conversation history with full context
 - [ ] Web API (FastAPI)
@@ -480,39 +507,61 @@ Planned features for future sessions:
 from .base import BaseTool
 from ..models.schemas import MathOperationInput, ToolOutput
 
-class SubtractNumbersTool(BaseTool):
+class DivideNumbersTool(BaseTool):
     def __init__(self, memory):
         self.memory = memory
     
     @property
     def name(self) -> str:
-        return "subtract_numbers"
+        return "divide_numbers"
     
     @property
     def description(self) -> str:
-        return "Subtract b from a. Returns a - b."
+        return "Divide a by b. Returns a / b."
     
     def execute(self, input_data: MathOperationInput) -> ToolOutput:
-        result = input_data.a - input_data.b
+        if input_data.b == 0:
+            return ToolOutput(
+                success=False,
+                error="Division by zero",
+                message="Cannot divide by zero"
+            )
+        
+        result = input_data.a / input_data.b
         self.memory.set_last_result(result)
+        self.memory.add_to_history(f"Divided {input_data.a} by {input_data.b} = {result}")
+        
         return ToolOutput(
             success=True,
             result=result,
-            message=f"{input_data.a} - {input_data.b} = {result}"
+            message=f"{input_data.a} ÷ {input_data.b} = {result}"
         )
 ```
 
 2. Register tool in `calculator_agent.py`:
 ```python
+# Import
+from ..tools.calculator import AddNumbersTool, MultiplyNumbersTool, SubtractNumbersTool, DivideNumbersTool
+
+# Add to tools list
 self.tools = [
     AddNumbersTool(self.memory),
     MultiplyNumbersTool(self.memory),
-    SubtractNumbersTool(self.memory),  # Add here
+    SubtractNumbersTool(self.memory),
+    DivideNumbersTool(self.memory),  # Add here
     # ...
 ]
+
+# Update tool definitions
+if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers"]:
+    # ...
+
+# Update input mapping
+if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers"]:
+    # ...
 ```
 
-3. Add tool definition in `_build_tool_definitions()` method
+3. Add tests in `tests/test_tools.py`
 
 ---
 
@@ -528,7 +577,7 @@ If you encounter issues:
 
 1. Check troubleshooting section above
 2. Verify all prerequisites are installed
-3. Test API connection with `test_api.py`
+3. Test API connection with `scripts/verify_api.py`
 4. Check `.env` file has valid API key
 
 ---
@@ -539,8 +588,25 @@ If you encounter issues:
 - [ ] uv installed
 - [ ] Project dependencies installed (`uv sync --all-extras`)
 - [ ] `.env` file created with API key
-- [ ] API test passes (`uv run python test_api.py`)
+- [ ] API test passes (`uv run python scripts/verify_api.py`)
 - [ ] Agent runs successfully (`uv run python main.py`)
 
 **If all checkboxes are ✅, you're ready to go!** 🚀
 
+---
+
+## 📊 Project Stats
+
+**Current Status:**
+- ✅ 5 tools implemented (add, multiply, subtract, save, recall)
+- ✅ Full agent orchestration with Claude
+- ✅ In-memory state management
+- ✅ Type-safe with Pydantic
+- ✅ Comprehensive tests
+- ✅ Professional structure
+
+**Next Up:**
+- Division tool (with error handling)
+- Power/exponent tool
+- Better error handling
+- Logging system
