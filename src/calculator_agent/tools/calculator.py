@@ -131,3 +131,102 @@ class SubtractNumbersTool(BaseTool):
                 error=str(e),
                 message=f"Failed to subtract numbers: {e}"
             )
+class DivideNumbersTool(BaseTool):
+    """Tool for dividing numbers with error handling"""
+    
+    def __init__(self, memory: "Memory"):
+        self.memory = memory
+    
+    @property
+    def name(self) -> str:
+        return "divide_numbers"
+    
+    @property
+    def description(self) -> str:
+        return (
+            "Divide a by b. Returns a / b. "
+            "Use this when the user asks to divide numbers. "
+            "Handles division by zero gracefully."
+        )
+    
+    def execute(self, input_data: MathOperationInput) -> ToolOutput:
+        """Divide with error handling"""
+        try:
+            # Validate: Check for division by zero
+            if input_data.b == 0:
+                return ToolOutput(
+                    success=False,
+                    error="division_by_zero",
+                    message="Cannot divide by zero. Please provide a non-zero divisor."
+                )
+            
+            result = input_data.a / input_data.b
+            
+            # Store result
+            self.memory.set_last_result(result)
+            self.memory.add_to_history(
+                f"Divided {input_data.a} by {input_data.b} = {result}"
+            )
+            
+            return ToolOutput(
+                success=True,
+                result=result,
+                message=f"{input_data.a} ÷ {input_data.b} = {result}"
+            )
+            
+        except Exception as e:
+            # Catch any other errors
+            return ToolOutput(
+                success=False,
+                error=str(e),
+                message=f"Error dividing numbers: {e}"
+            )
+class PowerNumbersTool(BaseTool):
+    """Tool for raising a number to a power"""
+    
+    def __init__(self, memory: "Memory"):
+        self.memory = memory
+    
+    @property
+    def name(self) -> str:
+        return "power_numbers"
+    
+    @property
+    def description(self) -> str:
+        return (
+            "Raise a to the power of b. Returns a^b. "
+            "Use this when the user asks for exponents, powers, squared, cubed, etc. "
+            "Example: 'What's 2 to the power of 8?' or '5 squared'"
+        )
+    
+    def execute(self, input_data: MathOperationInput) -> ToolOutput:
+        """Calculate power with error handling"""
+        try:
+            result = input_data.a ** input_data.b
+            
+            # Check for overflow or invalid results
+            if result == float('inf') or result == float('-inf'):
+                return ToolOutput(
+                    success=False,
+                    error="overflow",
+                    message=f"Result too large: {input_data.a}^{input_data.b} causes overflow"
+                )
+            
+            # Store result
+            self.memory.set_last_result(result)
+            self.memory.add_to_history(
+                f"Calculated {input_data.a} ^ {input_data.b} = {result}"
+            )
+            
+            return ToolOutput(
+                success=True,
+                result=result,
+                message=f"{input_data.a}^{input_data.b} = {result}"
+            )
+            
+        except Exception as e:
+            return ToolOutput(
+                success=False,
+                error=str(e),
+                message=f"Error calculating power: {e}"
+            )

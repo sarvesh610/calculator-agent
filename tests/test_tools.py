@@ -1,7 +1,7 @@
 """Pytest unit tests for calculator tools"""
 import pytest
 from src.calculator_agent.state.memory import Memory
-from src.calculator_agent.tools.calculator import AddNumbersTool, MultiplyNumbersTool
+from src.calculator_agent.tools.calculator import AddNumbersTool, MultiplyNumbersTool, SubtractNumbersTool, DivideNumbersTool, PowerNumbersTool
 from src.calculator_agent.tools.memory_tools import SaveResultTool, RecallResultTool
 from src.calculator_agent.models.schemas import (
     MathOperationInput,
@@ -139,3 +139,144 @@ class TestConversationFlow:
         result = recall_tool.execute(RecallResultInput(name="my_total"))
         
         assert result.result == 30
+class TestDivideNumbersTool:
+    """Tests for DivideNumbersTool"""
+    
+    def test_divide_positive_numbers(self):
+        memory = Memory()
+        tool = DivideNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10, b=2))
+        
+        assert result.success is True
+        assert result.result == 5
+        assert memory.get_last_result() == 5
+    
+    def test_divide_by_zero(self):
+        memory = Memory()
+        tool = DivideNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10, b=0))
+        
+        assert result.success is False
+        assert result.error == "division_by_zero"
+        assert "Cannot divide by zero" in result.message
+    
+    def test_divide_negative_numbers(self):
+        memory = Memory()
+        tool = DivideNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=-10, b=2))
+        
+        assert result.success is True
+        assert result.result == -5
+
+
+class TestPowerNumbersTool:
+    """Tests for PowerNumbersTool"""
+    
+    def test_power_positive_integers(self):
+        memory = Memory()
+        tool = PowerNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=2, b=8))
+        
+        assert result.success is True
+        assert result.result == 256
+    
+    def test_power_squared(self):
+        memory = Memory()
+        tool = PowerNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=5, b=2))
+        
+        assert result.success is True
+        assert result.result == 25
+    
+    def test_power_cubed(self):
+        memory = Memory()
+        tool = PowerNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=3, b=3))
+        
+        assert result.success is True
+        assert result.result == 27
+    
+    def test_power_zero(self):
+        memory = Memory()
+        tool = PowerNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10, b=0))
+        
+        assert result.success is True
+        assert result.result == 1  # Anything to the power of 0 is 1
+    
+    def test_power_negative_exponent(self):
+        memory = Memory()
+        tool = PowerNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=2, b=-2))
+        
+        assert result.success is True
+        assert result.result == 0.25  # 2^-2 = 1/4
+# Add this test class after TestMultiplyNumbersTool
+class TestSubtractNumbersTool:
+    """Tests for SubtractNumbersTool"""
+    
+    def test_subtract_positive_numbers(self):
+        """Test subtracting two positive numbers"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10, b=3))
+        
+        assert result.success is True
+        assert result.result == 7
+        assert memory.get_last_result() == 7
+    
+    def test_subtract_negative_result(self):
+        """Test subtraction resulting in negative number"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=5, b=10))
+        
+        assert result.success is True
+        assert result.result == -5
+        assert memory.get_last_result() == -5
+    
+    def test_subtract_from_zero(self):
+        """Test subtracting from zero"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=0, b=5))
+        
+        assert result.success is True
+        assert result.result == -5
+    
+    def test_subtract_zero(self):
+        """Test subtracting zero"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10, b=0))
+        
+        assert result.success is True
+        assert result.result == 10
+    
+    def test_subtract_negative_numbers(self):
+        """Test subtracting negative numbers"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=-5, b=-3))
+        
+        assert result.success is True
+        assert result.result == -2  # -5 - (-3) = -5 + 3 = -2
+    
+    def test_subtract_stores_in_memory(self):
+        """Test that result is stored in memory"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        tool.execute(MathOperationInput(a=100, b=25))
+        
+        assert memory.get_last_result() == 75
+        assert len(memory.get_history()) == 1
+        assert "Subtracted 25.0 from 100.0 = 75.0" in memory.get_history()[0]
+    
+    def test_subtract_decimal_numbers(self):
+        """Test subtracting decimal numbers"""
+        memory = Memory()
+        tool = SubtractNumbersTool(memory)
+        result = tool.execute(MathOperationInput(a=10.5, b=3.2))
+        
+        assert result.success is True
+        assert result.result == pytest.approx(7.3, rel=1e-9)
