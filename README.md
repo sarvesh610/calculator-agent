@@ -9,6 +9,7 @@ A conversational calculator that:
 - Remembers previous calculations
 - Saves and recalls named results
 - Demonstrates core AI agent patterns
+- Handles errors gracefully
 
 **Example conversation:**
 ```
@@ -18,14 +19,20 @@ Agent: 15 plus 27 equals 42.
 You: Multiply that by 3
 Agent: The result is 126.0
 
-You: Save that as my_total
-Agent: I've saved 126.0 as "my_total" for you!
+You: Divide that by 2
+Agent: The result is 63.0
 
-You: What was my_total?
-Agent: Your saved value "my_total" is 126.0.
+You: What's 5 squared?
+Agent: 5 squared equals 25.
 
-You: Subtract 10 from that
-Agent: The result is 116.0
+You: Save that as my_number
+Agent: I've saved 25.0 as "my_number" for you!
+
+You: What was my_number?
+Agent: Your saved value "my_number" is 25.0
+
+You: Divide 10 by 0
+Agent: I can't divide 10 by 0 because division by zero is undefined.
 ```
 
 ---
@@ -41,12 +48,12 @@ calculator-agent/
 │   ├── state/           # Memory/state management
 │   │   └── memory.py
 │   ├── tools/           # Individual tool implementations
-│   │   ├── base.py      # Base tool interface
-│   │   ├── calculator.py    # Math tools
+│   │   ├── base.py          # Base tool interface
+│   │   ├── calculator.py    # Math tools (5 operations)
 │   │   └── memory_tools.py  # Save/recall tools
 │   └── agents/          # Agent orchestrator
 │       └── calculator_agent.py
-├── tests/               # Pytest unit tests
+├── tests/               # Pytest unit tests (24 tests)
 ├── scripts/             # Verification scripts
 ├── docs/                # Documentation
 ├── main.py              # Entry point
@@ -145,8 +152,6 @@ cp .env.example .env
 nano .env
 # or
 code .env
-# or
-vim .env
 ```
 
 **Add your key:**
@@ -209,36 +214,35 @@ You:
 
 ### Example Session
 ```
-You: What's 25 plus 17?
-Agent: 25 plus 17 equals 42.
+You: What's 100 minus 25?
+Agent: 100 minus 25 equals 75.
 
-You: Multiply that by 2
-Agent: The result is 84.0
+You: Divide that by 5
+Agent: The result is 15.0
 
-You: Subtract 10 from that
-Agent: The result is 74.0
+You: What's 2 to the power of 8?
+Agent: 2 to the power of 8 equals 256.
 
-You: Save that as answer
-Agent: I've saved 74.0 as "answer" for you!
+You: Multiply that by 3
+Agent: The result is 768.0
 
-You: What's 100 minus 50?
-Agent: 100 minus 50 equals 50.
+You: Save that as result
+Agent: I've saved 768.0 as "result" for you!
 
-You: What was answer?
-Agent: Your saved value "answer" is 74.0.
+You: Divide 10 by 0
+Agent: I can't divide 10 by 0 because division by zero is undefined.
 
 You: history
 Conversation History:
-  - Added 25.0 + 17.0 = 42.0
-  - Multiplied 42.0 × 2.0 = 84.0
-  - Subtracted 10.0 from 84.0 = 74.0
-  - Saved 74.0 as 'answer'
-  - Subtracted 50.0 from 100.0 = 50.0
-  - Recalled 'answer' = 74.0
+  - Subtracted 25.0 from 100.0 = 75.0
+  - Divided 75.0 by 5.0 = 15.0
+  - Calculated 2.0 ^ 8.0 = 256.0
+  - Multiplied 256.0 × 3.0 = 768.0
+  - Saved 768.0 as 'result'
 
 You: saved
 Saved Results:
-  answer = 74.0
+  result = 768.0
 
 You: quit
 Goodbye!
@@ -257,7 +261,7 @@ uv run pytest
 uv run pytest -v
 
 # Run with coverage
-uv run pytest --cov=src
+uv run pytest --cov=src --cov-report=term-missing
 ```
 
 ### Run Verification Scripts
@@ -274,67 +278,69 @@ uv run python scripts/verify_tools.py
 
 ### Expected Test Output
 ```
-============================================================
-TESTING CALCULATOR AGENT TOOLS
-============================================================
-Testing AddNumbersTool...
-  ✅ 15.0 + 27.0 = 42.0
-  ✅ Last result stored: 42.0
-
-Testing MultiplyNumbersTool...
-  ✅ 6.0 × 7.0 = 42.0
-
-Testing SubtractNumbersTool...
-  ✅ 10.0 - 3.0 = 7.0
-  ✅ Last result stored: 7.0
-
-Testing SaveResultTool and RecallResultTool...
-  ✅ Saved 42.0 as 'my_number'
-  ✅ 'my_number' = 42.0
-  ✅ Correctly failed for non-existent result
-
-Testing conversation flow...
-  Step 1: 15.0 + 27.0 = 42.0
-  Step 2: 42.0 × 3.0 = 126.0
-  Step 3: Saved 126.0 as 'total'
-  ✅ Conversation flow works correctly!
-
-============================================================
-✅ ALL TOOL TESTS PASSED!
-============================================================
+======================== test session starts ========================
+tests/test_memory.py::TestMemory::test_initial_state PASSED
+tests/test_memory.py::TestMemory::test_save_and_recall_result PASSED
+tests/test_tools.py::TestAddNumbersTool::test_add_positive_numbers PASSED
+tests/test_tools.py::TestMultiplyNumbersTool::test_multiply_positive_numbers PASSED
+tests/test_tools.py::TestSubtractNumbersTool::test_subtract_positive_numbers PASSED
+tests/test_tools.py::TestDivideNumbersTool::test_divide_positive_numbers PASSED
+tests/test_tools.py::TestDivideNumbersTool::test_divide_by_zero PASSED
+tests/test_tools.py::TestPowerNumbersTool::test_power_positive_integers PASSED
+tests/test_tools.py::TestPowerNumbersTool::test_power_squared PASSED
+... (24 tests total)
+======================== 24 passed in 0.5s =========================
 ```
 
 ---
 
 ## 🛠️ Available Tools
 
-The agent currently has **5 tools** available:
+The agent currently has **7 tools** available:
 
-### 1. Add Numbers
+### Math Operations (5 tools)
+
+#### 1. Add Numbers
 **Usage:** "What's 5 plus 3?", "Add 10 and 20"
 ```python
 AddNumbersTool(a, b) → a + b
 ```
 
-### 2. Multiply Numbers
+#### 2. Multiply Numbers
 **Usage:** "Multiply 6 by 7", "What's 4 times 5?"
 ```python
 MultiplyNumbersTool(a, b) → a × b
 ```
 
-### 3. Subtract Numbers
+#### 3. Subtract Numbers
 **Usage:** "What's 50 minus 8?", "Subtract 10 from that"
 ```python
 SubtractNumbersTool(a, b) → a - b
 ```
 
-### 4. Save Result
+#### 4. Divide Numbers
+**Usage:** "Divide 100 by 4", "What's 72 divided by 6?"
+- ✅ **Error handling:** Gracefully handles division by zero
+```python
+DivideNumbersTool(a, b) → a ÷ b
+```
+
+#### 5. Power/Exponent
+**Usage:** "What's 2 to the power of 8?", "5 squared", "3 cubed"
+- ✅ **Error handling:** Detects overflow for very large results
+```python
+PowerNumbersTool(a, b) → a^b
+```
+
+### Memory Operations (2 tools)
+
+#### 6. Save Result
 **Usage:** "Save that as total", "Remember this as my_number"
 ```python
 SaveResultTool(name, value) → Saves value with name
 ```
 
-### 5. Recall Result
+#### 7. Recall Result
 **Usage:** "What was total?", "Recall my_number"
 ```python
 RecallResultTool(name) → Returns saved value
@@ -435,25 +441,7 @@ uv run python -c "import anthropic; print('✅ anthropic installed')"
 
 Current implementation uses in-memory storage. To persist data:
 1. See `docs/STORAGE_OPTIONS.md` for alternatives
-2. Future: We'll add SQLite/Redis for persistence
-
----
-
-### "uv: command not found"
-
-**Problem:** uv not installed or not in PATH
-
-**Solution:**
-```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Restart terminal or reload shell
-source ~/.bashrc  # or ~/.zshrc
-
-# Verify
-uv --version
-```
+2. Future sessions: We'll add SQLite/Redis for persistence
 
 ---
 
@@ -462,8 +450,9 @@ uv --version
 ### Understanding the Code
 
 - **`main.py`** - Entry point, interactive loop
-- **`src/calculator_agent/agents/calculator_agent.py`** - Main agent logic
-- **`src/calculator_agent/tools/`** - Tool implementations
+- **`src/calculator_agent/agents/calculator_agent.py`** - Main agent logic, Claude SDK integration
+- **`src/calculator_agent/tools/calculator.py`** - Math operation tools
+- **`src/calculator_agent/tools/memory_tools.py`** - Save/recall tools
 - **`src/calculator_agent/state/memory.py`** - State management
 
 ### Key Concepts
@@ -471,11 +460,13 @@ uv --version
 1. **Tool-based Architecture** - Each capability is a discrete tool
 2. **Agent Loop** - Agent → Tool → Result → Response cycle
 3. **State Management** - Memory shared across tools
-4. **Type Safety** - Pydantic validates all data
+4. **Error Handling** - Graceful failures (division by zero, overflow)
+5. **Type Safety** - Pydantic validates all data
 
 ### Documentation
 
 - [Anthropic API Docs](https://docs.anthropic.com/)
+- [Anthropic Agent SDK](https://platform.claude.com/docs/en/agent-sdk/quickstart)
 - [LangChain Docs](https://python.langchain.com/)
 - [Pydantic Docs](https://docs.pydantic.dev/)
 
@@ -483,18 +474,24 @@ uv --version
 
 ## 🔮 Future Enhancements
 
-Planned features for future sessions:
+### Session 3: Agent SDK Migration
+- [ ] Refactor to Anthropic Agent SDK
+- [ ] Implement pre/post handlers
+- [ ] Add streaming responses
+- [ ] Better error handling with middleware
 
-- [ ] Division tool (with error handling)
-- [ ] Power/exponent tool
+### Session 4: Advanced Features
 - [ ] Square root tool
+- [ ] Modulo/remainder tool
 - [ ] Persistent storage (SQLite/Redis)
 - [ ] Conversation history with full context
 - [ ] Web API (FastAPI)
-- [ ] Streaming responses
-- [ ] Error recovery and retry logic
-- [ ] Logging and debugging tools
-- [ ] Multi-agent systems
+
+### Session 5: Multi-Agent Systems
+- [ ] Multiple specialized agents
+- [ ] Agent-to-agent communication
+- [ ] Product search agent (web search integration)
+- [ ] Path to agentic commerce
 
 ---
 
@@ -502,83 +499,82 @@ Planned features for future sessions:
 
 ### Adding New Tools
 
-1. Create new tool class in `src/calculator_agent/tools/`:
+1. **Create tool class** in `src/calculator_agent/tools/calculator.py`:
 ```python
 from .base import BaseTool
 from ..models.schemas import MathOperationInput, ToolOutput
 
-class DivideNumbersTool(BaseTool):
+class ModuloNumbersTool(BaseTool):
+    """Tool for modulo operation"""
+    
     def __init__(self, memory):
         self.memory = memory
     
     @property
     def name(self) -> str:
-        return "divide_numbers"
+        return "modulo_numbers"
     
     @property
     def description(self) -> str:
-        return "Divide a by b. Returns a / b."
+        return "Calculate a modulo b (remainder of a divided by b)."
     
     def execute(self, input_data: MathOperationInput) -> ToolOutput:
-        if input_data.b == 0:
+        try:
+            if input_data.b == 0:
+                return ToolOutput(
+                    success=False,
+                    error="division_by_zero",
+                    message="Cannot calculate modulo with zero divisor"
+                )
+            
+            result = input_data.a % input_data.b
+            self.memory.set_last_result(result)
+            self.memory.add_to_history(
+                f"Calculated {input_data.a} mod {input_data.b} = {result}"
+            )
+            
+            return ToolOutput(
+                success=True,
+                result=result,
+                message=f"{input_data.a} mod {input_data.b} = {result}"
+            )
+        except Exception as e:
             return ToolOutput(
                 success=False,
-                error="Division by zero",
-                message="Cannot divide by zero"
+                error=str(e),
+                message=f"Error calculating modulo: {e}"
             )
-        
-        result = input_data.a / input_data.b
-        self.memory.set_last_result(result)
-        self.memory.add_to_history(f"Divided {input_data.a} by {input_data.b} = {result}")
-        
-        return ToolOutput(
-            success=True,
-            result=result,
-            message=f"{input_data.a} ÷ {input_data.b} = {result}"
-        )
 ```
 
-2. Register tool in `calculator_agent.py`:
+2. **Register in agent** (`calculator_agent.py`):
 ```python
 # Import
-from ..tools.calculator import AddNumbersTool, MultiplyNumbersTool, SubtractNumbersTool, DivideNumbersTool
+from ..tools.calculator import (..., ModuloNumbersTool)
 
 # Add to tools list
 self.tools = [
-    AddNumbersTool(self.memory),
-    MultiplyNumbersTool(self.memory),
-    SubtractNumbersTool(self.memory),
-    DivideNumbersTool(self.memory),  # Add here
-    # ...
+    ...,
+    ModuloNumbersTool(self.memory),
 ]
 
 # Update tool definitions
-if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers"]:
+if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", 
+                 "divide_numbers", "power_numbers", "modulo_numbers"]:
     # ...
 
 # Update input mapping
-if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers"]:
+if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", 
+                 "divide_numbers", "power_numbers", "modulo_numbers"]:
     # ...
 ```
 
-3. Add tests in `tests/test_tools.py`
+3. **Add tests** in `tests/test_tools.py`
 
 ---
 
 ## 📄 License
 
 This is a learning project. Feel free to use and modify.
-
----
-
-## 🙋 Support
-
-If you encounter issues:
-
-1. Check troubleshooting section above
-2. Verify all prerequisites are installed
-3. Test API connection with `scripts/verify_api.py`
-4. Check `.env` file has valid API key
 
 ---
 
@@ -590,6 +586,7 @@ If you encounter issues:
 - [ ] `.env` file created with API key
 - [ ] API test passes (`uv run python scripts/verify_api.py`)
 - [ ] Agent runs successfully (`uv run python main.py`)
+- [ ] All tests pass (`uv run pytest`)
 
 **If all checkboxes are ✅, you're ready to go!** 🚀
 
@@ -598,15 +595,32 @@ If you encounter issues:
 ## 📊 Project Stats
 
 **Current Status:**
-- ✅ 5 tools implemented (add, multiply, subtract, save, recall)
-- ✅ Full agent orchestration with Claude
-- ✅ In-memory state management
-- ✅ Type-safe with Pydantic
-- ✅ Comprehensive tests
-- ✅ Professional structure
+- ✅ **7 tools** implemented
+  - 5 math operations (add, multiply, subtract, divide, power)
+  - 2 memory operations (save, recall)
+- ✅ **24 comprehensive unit tests**
+  - 100% coverage of tool functionality
+  - Edge case testing (division by zero, negative numbers, etc.)
+- ✅ **Error handling**
+  - Division by zero detection
+  - Overflow detection
+  - Graceful error messages
+- ✅ **Full agent orchestration** with Claude SDK
+- ✅ **In-memory state management**
+- ✅ **Type-safe** with Pydantic
+- ✅ **Professional structure**
 
-**Next Up:**
-- Division tool (with error handling)
-- Power/exponent tool
-- Better error handling
-- Logging system
+**Learning Objectives Completed:**
+- ✅ Tool-based architecture
+- ✅ Agent decision-making and loops
+- ✅ State management across conversations
+- ✅ Error handling patterns
+- ✅ Testing strategies
+- ✅ Git workflow and version control
+
+**Next Session:**
+- Logging system (see agent reasoning)
+- Agent SDK migration
+- Streaming responses
+- Product search agent (commerce path)
+
