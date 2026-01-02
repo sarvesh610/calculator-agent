@@ -1,11 +1,18 @@
 """Main entry point for the calculator agent"""
+import sys
 from src.calculator_agent.agents.calculator_agent import CalculatorAgent
 
 
 def main():
     """Run the calculator agent in interactive mode"""
+    
+    # Check if logging flag is passed
+    enable_logging = "--debug" in sys.argv or "--verbose" in sys.argv
+    
     print("=" * 60)
     print("CALCULATOR AGENT")
+    if enable_logging:
+        print("🔍 DEBUG MODE ENABLED")
     print("=" * 60)
     print("I can help you with calculations!")
     print("Try: 'What's 15 plus 27?'")
@@ -14,11 +21,13 @@ def main():
     print("     'What was my_total?'")
     print()
     print("Type 'quit' to exit, 'history' to see conversation")
+    if not enable_logging:
+        print("Type 'debug on' to enable debug logging")
     print("=" * 60)
     print()
     
-    # Initialize agent
-    agent = CalculatorAgent()
+    # Initialize agent with logging option
+    agent = CalculatorAgent(enable_logging=enable_logging)
     
     # Interactive loop
     while True:
@@ -31,6 +40,16 @@ def main():
             if user_input.lower() in ["quit", "exit", "q"]:
                 print("\nGoodbye!")
                 break
+            
+            if user_input.lower() == "debug on":
+                agent.enable_logging = True
+                print("🔍 Debug logging enabled\n")
+                continue
+            
+            if user_input.lower() == "debug off":
+                agent.enable_logging = False
+                print("Debug logging disabled\n")
+                continue
             
             if user_input.lower() == "history":
                 print("\nConversation History:")
@@ -51,6 +70,7 @@ def main():
                 continue
             
             # Run the agent
+            print()  # Blank line before response
             response = agent.run(user_input)
             print(f"\nAgent: {response}\n")
             
@@ -59,6 +79,9 @@ def main():
             break
         except Exception as e:
             print(f"\nError: {e}\n")
+            if agent.enable_logging:
+                import traceback
+                traceback.print_exc()
 
 
 if __name__ == "__main__":

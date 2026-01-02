@@ -3,27 +3,35 @@ from typing import Any
 from anthropic import Anthropic
 from ..config.settings import settings
 from ..state.memory import Memory
-from ..tools.calculator import AddNumbersTool, MultiplyNumbersTool, SubtractNumbersTool, DivideNumbersTool, PowerNumbersTool
+from ..tools.calculator import (
+    AddNumbersTool, 
+    MultiplyNumbersTool, 
+    SubtractNumbersTool,
+    DivideNumbersTool,
+    PowerNumbersTool
+)
 from ..tools.memory_tools import SaveResultTool, RecallResultTool
 from ..tools.base import BaseTool
+from ..utils.logger import agent_logger
 
 
 class CalculatorAgent:
     """Agent that orchestrates calculator tools"""
     
-    def __init__(self):
+    def __init__(self, enable_logging: bool = False):
         self.client = Anthropic(api_key=settings.anthropic_api_key)
         self.memory = Memory()
+        self.enable_logging = enable_logging
         
         # Initialize tools
         self.tools: list[BaseTool] = [
             AddNumbersTool(self.memory),
             MultiplyNumbersTool(self.memory),
-            SaveResultTool(self.memory),
-            RecallResultTool(self.memory),
             SubtractNumbersTool(self.memory),
             DivideNumbersTool(self.memory),
-            PowerNumbersTool(self.memory)
+            PowerNumbersTool(self.memory),
+            SaveResultTool(self.memory),
+            RecallResultTool(self.memory),
         ]
         
         # Build tool definitions for Claude
@@ -37,6 +45,9 @@ When the user refers to "that" or "it" or "the result", they mean the most recen
 Guidelines:
 - Use add_numbers for addition
 - Use multiply_numbers for multiplication  
+- Use subtract_numbers for subtraction
+- Use divide_numbers for division
+- Use power_numbers for exponents/powers
 - Use save_result to save values with names
 - Use recall_result to retrieve saved values
 - When user says "multiply that" or "add to that", use the last calculation result
@@ -48,7 +59,8 @@ Be concise and friendly in your responses."""
         definitions = []
         
         for tool in self.tools:
-            if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers", "power_numbers"]:
+            if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", 
+                           "divide_numbers", "power_numbers"]:
                 schema = {
                     "type": "object",
                     "properties": {
@@ -134,22 +146,42 @@ Be concise and friendly in your responses."""
         Returns:
             The agent's response
         """
+        if self.enable_logging:
+            agent_logger.agent_thinking(f"Processing: '{user_message}'")
+        
         # Build user message with context
         context = self._build_context_message()
         full_message = f"{context}\n\nUser: {user_message}" if context else user_message
         
+        if self.enable_logging and context:
+            agent_logger.debug(f"Context: {context}")
+        
         messages = [{"role": "user", "content": full_message}]
         
         # Agent loop: may require multiple tool calls
-        while True:
-            response = self.client.messages.create(
-                model=settings.model_name,
-                max_tokens=settings.max_tokens,
-                temperature=settings.temperature,
-                system=self.system_prompt,
-                tools=self.tool_definitions,
-                messages=messages
-            )
+        iteration = 0
+        max_iterations = 10  # Prevent infinite loops
+        
+        while iteration < max_iterations:
+            iteration += 1
+            
+            if self.enable_logging:
+                agent_logger.debug(f"Agent loop iteration {iteration}")
+            
+            try:
+                response = self.client.messages.create(
+                    model=settings.model_name,
+                    max_tokens=settings.max_tokens,
+                    temperature=settings.temperature,
+                    system=self.system_prompt,
+                    tools=self.tool_definitions,
+                    messages=messages
+                )
+            except Exception as e:
+                error_msg = f"API error: {e}"
+                if self.enable_logging:
+                    agent_logger.error(error_msg, e)
+                return f"I encountered an error: {str(e)}"
             
             # Check if Claude wants to use a tool
             if response.stop_reason == "tool_use":
@@ -161,10 +193,28 @@ Be concise and friendly in your responses."""
                         break
                 
                 if tool_use:
+                    if self.enable_logging:
+                        agent_logger.tool_call(tool_use.name, tool_use.input)
+                    
                     # Get the tool
                     tool = self._get_tool_by_name(tool_use.name)
                     if not tool:
-                        return f"Error: Unknown tool {tool_use.name}"
+                        error_msg = f"Unknown tool {tool_use.name}"
+                        if self.enable_logging:
+                            agent_logger.error(error_msg)
+                        
+                        # IMPORTANT: Send error back as tool_result
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": tool_use.id,
+                                "content": error_msg,
+                                "is_error": True
+                            }]
+                        })
+                        continue
                     
                     # Execute the tool
                     from ..models.schemas import (
@@ -173,27 +223,55 @@ Be concise and friendly in your responses."""
                         RecallResultInput
                     )
                     
-                    # Map input based on tool type
-                    if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", "divide_numbers", "power_numbers"]:
-                        tool_input = MathOperationInput(**tool_use.input)
-                    elif tool.name == "save_result":
-                        tool_input = SaveResultInput(**tool_use.input)
-                    elif tool.name == "recall_result":
-                        tool_input = RecallResultInput(**tool_use.input)
-                    
-                    # Execute
-                    result = tool.execute(tool_input)
-                    
-                    # Add tool result to messages
-                    messages.append({"role": "assistant", "content": response.content})
-                    messages.append({
-                        "role": "user",
-                        "content": [{
-                            "type": "tool_result",
-                            "tool_use_id": tool_use.id,
-                            "content": result.message
-                        }]
-                    })
+                    try:
+                        # Map input based on tool type
+                        if tool.name in ["add_numbers", "multiply_numbers", "subtract_numbers", 
+                                       "divide_numbers", "power_numbers"]:
+                            tool_input = MathOperationInput(**tool_use.input)
+                        elif tool.name == "save_result":
+                            tool_input = SaveResultInput(**tool_use.input)
+                        elif tool.name == "recall_result":
+                            tool_input = RecallResultInput(**tool_use.input)
+                        
+                        # Execute
+                        result = tool.execute(tool_input)
+                        
+                        if self.enable_logging:
+                            agent_logger.tool_result(
+                                tool.name, 
+                                result.success, 
+                                result.message
+                            )
+                        
+                        # Add tool result to messages
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": tool_use.id,
+                                "content": result.message,
+                                "is_error": not result.success  # Mark if tool failed
+                            }]
+                        })
+                        
+                    except Exception as e:
+                        # Handle tool execution errors
+                        error_msg = f"Tool execution failed: {e}"
+                        if self.enable_logging:
+                            agent_logger.error(error_msg, e)
+                        
+                        # Send error back as tool_result
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": [{
+                                "type": "tool_result",
+                                "tool_use_id": tool_use.id,
+                                "content": error_msg,
+                                "is_error": True
+                            }]
+                        })
                     
                     # Continue the loop - Claude will process the result
                     continue
@@ -201,9 +279,19 @@ Be concise and friendly in your responses."""
             # No more tool calls - extract final response
             for block in response.content:
                 if hasattr(block, "text"):
+                    if self.enable_logging:
+                        agent_logger.agent_response(block.text)
                     return block.text
             
+            # If we get here, something unexpected happened
+            if self.enable_logging:
+                agent_logger.error("No text response found in Claude's output")
             return "I couldn't generate a response."
+        
+        # Hit max iterations
+        if self.enable_logging:
+            agent_logger.error(f"Hit max iterations ({max_iterations})")
+        return "I apologize, but I'm having trouble completing this request."
     
     def get_conversation_history(self) -> list[str]:
         """Get the conversation history"""
